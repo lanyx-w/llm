@@ -9,7 +9,6 @@
 | [`anythingllm-mcp`](anythingllm-mcp) | 封装本地 AnythingLLM 单一工作区的 MCP 服务器（工具：`ask_workspace`），仅基于工作区内容作答 |
 | [`AnythingLLMServer`](AnythingLLMServer) | 纯前端 AnythingLLM 管理台（单文件 `index.html`），管理工作区、上传文档、浏览文档树 |
 | [`pethospital-mcp`](pethospital-mcp) | 宠物医院 REST API 的 MCP 服务器（工具：`list_pets` / `create_pet`），支持 stdio 与 Streamable HTTP |
-| [`opencode.json`](opencode.json) | opencode 的 MCP 配置，接入 modelscope 与 anythingllm |
 
 ## anythingllm-mcp
 
@@ -43,7 +42,7 @@ python -m pethospital_mcp -stdio
 
 ## opencode 配置
 
-`opencode.json` 配置了两个 MCP：
+opencode 的 MCP 接入配置位于仓库外的 `D:/AI/opencode.json`（保留在 AI 根目录，供本地 opencode 使用），其中配置了两个 MCP：
 
 - `modelscope`：远程 MCP
-- `anythingllm`：本地 MCP（指向 `anythingllm-mcp`，环境变量文件为 `D:/AI/anythingllm-mcp/.env`）
+- `anythingllm`：本地 MCP（指向 `anythingllm-mcp`，环境变量文件为 `D:/AI/LLM/anythingllm-mcp/.env`）
