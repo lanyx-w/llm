@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "modelscope": {
+      "type": "remote",
+      "url": "https://mcp.api-inference.modelscope.net/abdd3009e1a34e/mcp",
+      "enabled": true
+    },
+    "anythingllm": {
+      "type": "local",
+      "command": ["anythingllm-mcp"],
+      "enabled": true,
+      "environment": {
+        "ANYTHINGLLM_ENV_FILE": "D:/AI/anythingllm-mcp/.env"
+      }
+    }
+  }
+}

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>AnythingLLM 管理台</title>
+<style>
+  body { font-family: sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; }
+  input, button, select { font-size: 14px; padding: 5px 8px; margin: 2px; }
+  section { border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin-bottom: 16px; }
+  h2 { font-size: 18px; margin-top: 0; }
+  ul { padding-left: 18px; }
+  .ok { color: #2e7d32; } .err { color: #c62828; }
+  .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .file { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; }
+  .folder { cursor: pointer; user-select: none; }
+  #status { white-space: pre-wrap; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>AnythingLLM 管理台</h1>
+
+<section>
+  <h2>工作区管理</h2>
+  <div class="row">
+    <select id="wsSelect" style="min-width:260px"></select>
+    <button id="btnReload">刷新</button>
+    <input id="newWsName" placeholder="新工作区名称">
+    <button id="btnNewWs">新建</button>
+    <button id="btnDelWs">删除工作区</button>
+  </div>
+</section>
+
+<section>
+  <h2>上传文档</h2>
+  <div class="row">
+    <input type="file" id="file" multiple>
+    <button id="btn">上传到当前工作区</button>
+  </div>
+  <div id="status"></div>
+</section>
+
+<section>
+  <h2>文档</h2>
+  <p><b>当前工作区已嵌入文档:</b></p>
+  <ul id="wsDocs"></ul>
+  <div class="row" style="margin-top:8px">
+    <b>存储文档树</b>
+    <input id="newFolder" placeholder="新文件夹名">
+    <button id="btnNewFolder">新建文件夹</button>
+  </div>
+  <div id="tree"></div>
+</section>
+
+<script>
+const API = "http://localhost:3001/api/v1";
+const KEY = "STRC5E4-NPQ4YVN-QN0JH9P-HPDDV38";
+
+const $ = id => document.getElementById(id);
+const log = (t, c) => $("status").innerHTML += `<div class="${c || ""}">${t}</div>`;
+
+async function api(path, method = "GET", body) {
+  const opt = { method, headers: { Authorization: `Bearer ${KEY}` } };
+  if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  const res = await fetch(API + path, opt);
+  return res.json();
+}
+
+async function loadWorkspaces() {
+  const d = await api("/workspaces");
+  $("wsSelect").innerHTML = d.workspaces.map(w =>
+    `<option value="${w.slug}">${w.name}</option>`).join("");
+  await loadDocs();
+}
+
+async function loadDocs() {
+  const slug = $("wsSelect").value;
+  const d = await api(`/workspace/${slug}`);
+  const docs = (d.workspace[0].documents || []).map(x => ({
+    name: x.docpath,
+    title: safeParse(x.metadata).title || x.filename
+  }));
+  $("wsDocs").innerHTML = docs.map(x =>
+    `<li class="file"><span>${x.title}</span><button data-name="${x.name}">删除</button></li>`).join("");
+  bindDelete($("wsDocs"));
+}
+
+function safeParse(s) { try { return JSON.parse(s) || {}; } catch { return {}; } }
+
+async function renderTree() {
+  const d = await api("/documents");
+  $("tree").innerHTML = buildTree(d.localFiles);
+  bindDelete($("tree"));
+}
+function buildTree(node) {
+  if (!node || !node.items) return "";
+  return "<ul>" + node.items.map(i => i.type === "folder"
+    ? `<li><span class="folder">📁 ${i.name}</span><div class="sub" style="display:none">${buildTree(i)}</div></li>`
+    : `<li class="file"><span>📄 ${i.title}</span><button data-name="${i.name}">删除</button></li>`).join("") + "</ul>";
+}
+
+function bindDelete(container) {
+  container.querySelectorAll("button[data-name]").forEach(b => b.addEventListener("click", async () => {
+    if (!confirm(`确定删除文档?`)) return;
+    const r = await api("/system/remove-documents", "DELETE", { names: [b.dataset.name] });
+    log(r.success ? `✔ 已删除 ${b.dataset.name}` : `✘ ${r.message || "删除失败"}`, r.success ? "ok" : "err");
+    await loadDocs(); await renderTree();
+  }));
+}
+$("tree").addEventListener("click", e => {
+  const f = e.target.closest(".folder");
+  if (!f) return;
+  const sub = f.nextElementSibling;
+  sub.style.display = sub.style.display === "none" ? "block" : "none";
+});
+
+$("wsSelect").addEventListener("change", loadDocs);
+$("btnReload").addEventListener("click", () => { loadWorkspaces(); renderTree(); });
+$("btnNewWs").addEventListener("click", async () => {
+  const name = $("newWsName").value.trim();
+  if (!name) return;
+  await api("/workspace/new", "POST", { name });
+  $("newWsName").value = "";
+  await loadWorkspaces();
+});
+$("btnDelWs").addEventListener("click", async () => {
+  const slug = $("wsSelect").value;
+  if (!confirm("确定删除当前工作区?")) return;
+  await api(`/workspace/${encodeURIComponent(slug)}`, "DELETE");
+  await loadWorkspaces();
+});
+$("btnNewFolder").addEventListener("click", async () => {
+  const name = $("newFolder").value.trim();
+  if (!name) return;
+  await api("/document/create-folder", "POST", { name });
+  $("newFolder").value = "";
+  await renderTree();
+});
+$("btn").addEventListener("click", async () => {
+  const files = $("file").files;
+  if (!files.length) return log("请选择文件", "err");
+  const target = $("wsSelect").value;
+  for (const f of files) {
+    log(`上传 ${f.name} ...`);
+    const fd = new FormData();
+    fd.append("file", f);
+    fd.append("addToWorkspaces", target);
+    const res = await fetch(`${API}/document/upload`, {
+      method: "POST", headers: { Authorization: `Bearer ${KEY}` }, body: fd
+    });
+    const data = await res.json();
+    if (data.success) {
+      const d = data.documents[0];
+      log(`✔ ${d.title} 上传并嵌入成功 (${d.token_count_estimate || "?"} tokens)`, "ok");
+    } else log(`✘ ${f.name}: ${data.error || JSON.stringify(data)}`, "err");
+  }
+  await loadDocs(); await renderTree();
+});
+
+loadWorkspaces(); renderTree();
+</script>
+</body>
+</html>
