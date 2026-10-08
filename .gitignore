@@ -24,3 +24,5 @@ dist/
 *.err
 .DS_Store
 Thumbs.db
+
+config.ini

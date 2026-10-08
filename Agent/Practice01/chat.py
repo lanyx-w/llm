@@ -8,15 +8,29 @@ llm = config["llm"]
 
 client = OpenAI(base_url=llm["base_url"], api_key=llm["api_key"])
 
-question = input("请输入问题: ").strip()
+messages = []
 
-print("---")
+while True:
+    try:
+        question = input("请输入问题: ").strip()
 
-for chunk in client.chat.completions.create(
-    model=llm["model_name"],
-    messages=[{"role": "user", "content": question}],
-    stream=True,
-):
-    print(chunk.choices[0].delta.content or "", end="", flush=True)
+        messages.append({"role": "user", "content": question})
 
-print()
+        print("---")
+
+        reply = ""
+        for chunk in client.chat.completions.create(
+            model=llm["model_name"],
+            messages=messages,
+            stream=True,
+        ):
+            delta = chunk.choices[0].delta.content or ""
+            reply += delta
+            print(delta, end="", flush=True)
+
+        messages.append({"role": "assistant", "content": reply})
+
+        print()
+    except KeyboardInterrupt:
+        print("\n已停止")
+        break
