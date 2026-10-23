@@ -1,0 +1,103 @@
+Screen {
+    layout: vertical;
+    background: $surface;
+}
+
+Header {
+    background: $primary;
+    color: $text;
+}
+
+Footer {
+    background: $panel;
+}
+
+#workspace {
+    height: 1fr;
+}
+
+#main {
+    width: 1fr;
+    height: 1fr;
+}
+
+#info {
+    height: auto;
+    margin: 1 2 0 2;
+    padding: 0 1;
+    border: round $primary;
+    background: $panel;
+}
+
+#transcript {
+    height: 1fr;
+    padding: 1 2;
+    overflow-y: auto;
+}
+
+#sidebar {
+    width: 42;
+    height: 1fr;
+    padding: 0 1;
+    border-left: solid $surface-lighten-2;
+    background: $panel 40%;
+}
+
+#sidebar.hidden {
+    display: none;
+}
+
+#status {
+    height: 1;
+    padding: 0 2;
+    background: $panel;
+    color: $text-muted;
+}
+
+#prompt {
+    height: 3;
+    margin: 0 2;
+    border: round $primary;
+    background: $surface;
+}
+
+.message {
+    height: auto;
+    margin-bottom: 1;
+    padding: 0 1;
+    border-left: thick $primary;
+}
+
+.message.user {
+    border-left: thick $warning;
+}
+
+.message.assistant {
+    border-left: thick $primary;
+}
+
+.message.tool {
+    border-left: thick $success;
+}
+
+.message.notice {
+    border-left: thick $surface-lighten-2;
+    background: $panel;
+}
+
+.message.notice.error {
+    border-left: thick $error;
+}
+
+.message .role {
+    text-style: bold;
+    color: $text-muted;
+}
+
+.tool-header {
+    text-style: bold;
+}
+
+.tool-details {
+    margin-top: 0;
+}
