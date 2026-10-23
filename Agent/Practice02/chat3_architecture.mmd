@@ -1,0 +1,134 @@
+%% chat3.py 代码架构图
+%% 分层：配置层 / 主循环层 / LLM 交互层 / 工具定义层 / 工具实现层 / 公共辅助层
+flowchart TD
+
+    %% ---------- 配置层 ----------
+    subgraph CONFIG["配置层"]
+        direction TB
+        INI["config.ini<br/>[llm] base_url / model_name / api_key"]
+        CFG["configparser 读取配置"]
+        CLIENT["OpenAI 客户端<br/>client = OpenAI(base_url, api_key)"]
+        INI --> CFG --> CLIENT
+    end
+
+    %% ---------- 主循环层 ----------
+    subgraph MAIN["主循环层 (主程序入口)"]
+        direction TB
+        START(["程序启动"]) --> INIT["messages = []"]
+        INIT --> INPUT["input() 读取用户问题"]
+        INPUT -->|空输入| INPUT
+        INPUT -->|有效问题| APPEND_USER["messages.append<br/>role=user"]
+        APPEND_USER --> STREAM_CALL["调用 stream_reply(messages)"]
+        STREAM_CALL --> HAS_TOOL{"是否存在<br/>tool_calls?"}
+        HAS_TOOL -->|否| APPEND_ANSWER["messages.append<br/>role=assistant, content=reply"]
+        APPEND_ANSWER --> INPUT
+        HAS_TOOL -->|是| APPEND_ASSISTANT["messages.append<br/>role=assistant<br/>content + tool_calls"]
+        APPEND_ASSISTANT --> LOOP_TOOL["遍历每个 tool_call"]
+        LOOP_TOOL --> PRINT_CALL["打印 [调用工具]"]
+        PRINT_CALL --> CALL_TOOL["call_tool(name, arguments)"]
+        CALL_TOOL --> PRINT_RET["打印 [工具返回]"]
+        PRINT_RET --> APPEND_TOOL["messages.append<br/>role=tool, tool_call_id, content"]
+        APPEND_TOOL --> STREAM_CALL
+        INPUT -.Interrupt / EOF.-> STOP(["打印 已停止 / 退出"])
+    end
+
+    %% ---------- LLM 交互层 ----------
+    subgraph LLM_LAYER["LLM 流式交互层"]
+        direction TB
+        SR["stream_reply(messages)"]
+        SR --> CREATE["client.chat.completions.create<br/>stream=True, tools=TOOLS"]
+        CREATE --> CHUNK["逐 chunk 解析 delta"]
+        CHUNK --> DELTA_CONTENT["delta.content<br/>累加 reply 并实时打印"]
+        CHUNK --> DELTA_TOOL["delta.tool_calls<br/>按 index 拼装 name / arguments / id"]
+        DELTA_CONTENT --> RETURN_SR["return (reply, tool_calls)"]
+        DELTA_TOOL --> RETURN_SR
+    end
+
+    %% ---------- 工具定义层 ----------
+    subgraph TOOLS_DEF["工具定义层 (JSON Schema)"]
+        direction TB
+        TOOLS_LIST["TOOLS: List[dict]<br/>type=function 的 OpenAI 工具描述"]
+        T_BASE["基础工具<br/>getDate / isLeapYear / getCwd"]
+        T_READ["读取类工具<br/>listDirectory / getFileType / readTextFile"]
+        T_WRITE["写入类工具<br/>createFile / editFile"]
+        T_DIR["目录管理工具<br/>createDirectory / deleteDirectory"]
+        T_DEL["删除与重命名工具<br/>deleteFile / renameFileOrDirectory"]
+        TOOLS_LIST --- T_BASE
+        TOOLS_LIST --- T_READ
+        TOOLS_LIST --- T_WRITE
+        TOOLS_LIST --- T_DIR
+        TOOLS_LIST --- T_DEL
+    end
+
+    %% ---------- 路由与工具实现层 ----------
+    subgraph DISPATCH["工具调度层"]
+        direction TB
+        DISPATCH_FN["call_tool(name, arguments)"]
+        PARSE["json.loads(arguments)<br/>失败返回 参数解析失败"]
+        ROUTE["按 name 字符串路由<br/>if/elif 分发"]
+        UNKNOWN["未知工具: name"]
+        DISPATCH_FN --> PARSE --> ROUTE
+        ROUTE --> UNKNOWN
+    end
+
+    subgraph IMPL["工具实现层"]
+        direction TB
+        I_BASE["get_date()<br/>run_command 跨平台取时间"]
+        I_LEAP["is_leap_year(year)"]
+        I_CWD["get_cwd()"]
+        I_LIST["list_directory(path)"]
+        I_TYPE["get_file_type(path)"]
+        I_READ["read_text_file(path)"]
+        I_CREATE["create_file(directory, filename, content)"]
+        I_EDIT["edit_file(path, content, mode, old_text)"]
+        I_MKDIR["create_directory(path)"]
+        I_RMDIR["delete_directory(path)"]
+        I_RMFILE["delete_file(path)"]
+        I_RENAME["rename_file_or_directory(path, new_name)"]
+    end
+
+    %% ---------- 公共辅助层 ----------
+    subgraph HELPER["公共辅助层"]
+        direction TB
+        H_CMD["run_command(cmd)<br/>subprocess + 多编码解码"]
+        H_PATH["resolve_path(path)<br/>expanduser / 相对转绝对 / abspath"]
+        H_TEXT["looks_like_text(path)<br/>扩展名白/黑名单 + MIME + 控制字符采样"]
+        H_DECODE["read_text(path)<br/>utf-8-sig / gbk / locale / utf-8 逐级尝试"]
+        H_EXT["常量集合<br/>TEXT_EXTENSIONS / BINARY_EXTENSIONS"]
+    end
+
+    %% ---------- 跨层关系 ----------
+    STREAM_CALL --> SR
+    SR -.使用.-> CLIENT
+    SR -.传入.-> TOOLS_LIST
+    CALL_TOOL --> DISPATCH_FN
+    ROUTE -.分发.-> I_BASE
+    ROUTE -.分发.-> I_LEAP
+    ROUTE -.分发.-> I_CWD
+    ROUTE -.分发.-> I_LIST
+    ROUTE -.分发.-> I_TYPE
+    ROUTE -.分发.-> I_READ
+    ROUTE -.分发.-> I_CREATE
+    ROUTE -.分发.-> I_EDIT
+    ROUTE -.分发.-> I_MKDIR
+    ROUTE -.分发.-> I_RMDIR
+    ROUTE -.分发.-> I_RMFILE
+    ROUTE -.分发.-> I_RENAME
+
+    I_BASE --> H_CMD
+    I_LIST --> H_PATH
+    I_TYPE --> H_PATH
+    I_READ --> H_PATH
+    I_CREATE --> H_PATH
+    I_EDIT --> H_PATH
+    I_MKDIR --> H_PATH
+    I_RMDIR --> H_PATH
+    I_RMFILE --> H_PATH
+    I_RENAME --> H_PATH
+    I_TYPE --> H_TEXT
+    I_READ --> H_TEXT
+    I_EDIT --> H_TEXT
+    I_READ --> H_DECODE
+    I_EDIT --> H_DECODE
+    H_TEXT --> H_EXT
+    H_TEXT --> H_CMD
