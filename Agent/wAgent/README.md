@@ -12,7 +12,7 @@
 wAgent/
 ├── main.py                    # 组合根：装配 core 与 tui
 ├── config.example.ini         # 配置模板
-├── requirements.txt           # openai + textual
+├── requirements.txt           # openai + textual + trafilatura
 ├── core/                      # 业务内核（无 UI 依赖）
 │   ├── __init__.py
 │   ├── cancellation.py        # CancellationToken（Esc 中断）
@@ -25,6 +25,8 @@ wAgent/
 │       ├── base.py            # ToolSpec / ToolRegistry
 │       ├── basic.py           # 日期、闰年、工作目录
 │       ├── filesystem.py      # 文件/目录读写与增删改
+│       ├── search.py          # 百度搜索 web_search 联网搜索
+│       ├── web.py             # curl 抓取网页 + trafilatura 提取 Markdown
 │       └── helpers.py         # 路径、编码、文本判定等公共能力
 └── tui/                       # Textual 终端界面
     ├── __init__.py
@@ -75,9 +77,17 @@ User ──send(text)──> Agent
 cd Agent/wAgent
 pip install -r requirements.txt
 copy config.example.ini config.ini   # Windows；Linux/macOS 用 cp
-# 编辑 config.ini，填入 api_key
+# 编辑 config.ini，填入 [llm] api_key 和 [search] baiduqianfan_api_key
 python main.py
 ```
+
+> `fetchWeb` 通过系统 `curl` 抓取网页（Windows 10+ 已自带），并用 `trafilatura`
+> 提取正文；如需使用该工具，请确保 `curl` 位于 `PATH` 中。静态 HTML 无法提取正文或
+> 正文过短时，会自动尝试调用本机 Edge / Chrome 无头浏览器渲染页面，以支持 JavaScript 动态内容。
+
+> `searchweb` 使用百度搜索 `web_search` 接口；请在 `config.ini` 的 `[search]`
+> 段配置 `baiduqianfan_api_key`，API 地址可通过 `base_url` 覆盖。
+> 该接口只需 API Key，无需 `appid`；返回每条结果的摘要、标题和 URL。
 
 `config.ini` 已被 `.gitignore` 忽略。也可通过环境变量指定配置位置：
 
@@ -125,7 +135,7 @@ set WAGENT_CONFIG=D:\path\to\config.ini   # Windows
 
 1. 在 `core/tools/` 下新增实现函数，失败返回提示字符串、成功返回结果字符串。
 2. 用 `ToolSpec(name, description, parameters, handler)` 描述工具。
-3. 加入 `BASIC_TOOLS` / `FILESYSTEM_TOOLS`，或在组合根向 `ToolRegistry` 注册。
+3. 加入 `BASIC_TOOLS` / `FILESYSTEM_TOOLS` / `WEB_TOOLS` / `build_search_tools()`，或在组合根向 `ToolRegistry` 注册。
 
 Agent 和 UI 均无需修改。
 

@@ -16,6 +16,16 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_ENV_VAR = "WAGENT_CONFIG"
 DEFAULT_CONFIG_NAME = "config.ini"
 
+DEFAULT_SEARCH_BASE_URL = "https://qianfan.baidubce.com/v2/ai_search/web_search"
+SEARCH_API_KEY_FIELDS = (
+    "baiduqianfan_api_key",
+    "baiduqianfan",
+    "qianfan_api_key",
+    "baidu_qianfan_api_key",
+    "baiduqianfan_apikey",
+    "api_key",
+)
+
 
 class ConfigError(RuntimeError):
     """Raised when the agent configuration is missing or invalid."""
@@ -95,3 +105,56 @@ def _read_ini(path: Path) -> LLMConfig:
         )
 
     return LLMConfig(**values)
+
+
+@dataclass(frozen=True, slots=True)
+class SearchConfig:
+    """Immutable Baidu Qianfan web-search settings."""
+
+    api_key: str = ""
+    base_url: str = DEFAULT_SEARCH_BASE_URL
+    config_path: str = ""
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.api_key)
+
+
+def load_search_config(path: str | Path | None = None) -> SearchConfig:
+    """Load ``[search]`` settings without blocking agent startup.
+
+    The same file search order as :func:`load_config` is used. When the file,
+    section or API key is missing, an empty :class:`SearchConfig` is returned so
+    the search tool can surface a clear error through its tool result.
+    """
+
+    for candidate in _candidate_paths(path):
+        if candidate.is_file():
+            return _read_search_ini(candidate)
+    return SearchConfig()
+
+
+def _read_search_ini(path: Path) -> SearchConfig:
+    parser = configparser.ConfigParser(interpolation=None)
+    try:
+        read_ok = parser.read(path, encoding="utf-8")
+    except (OSError, configparser.Error):
+        return SearchConfig(config_path=str(path))
+
+    if not read_ok or not parser.has_section("search"):
+        return SearchConfig(config_path=str(path))
+
+    section = parser["search"]
+    api_key = ""
+    for key in SEARCH_API_KEY_FIELDS:
+        value = section.get(key, "").strip()
+        if value:
+            api_key = value
+            break
+
+    base_url = section.get("base_url", "").strip() or DEFAULT_SEARCH_BASE_URL
+    return SearchConfig(
+        api_key=api_key,
+        base_url=base_url,
+        config_path=str(path),
+    )

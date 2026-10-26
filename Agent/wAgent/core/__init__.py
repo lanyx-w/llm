@@ -2,7 +2,7 @@
 
 from .agent import Agent
 from .cancellation import CancellationToken
-from .config import ConfigError, LLMConfig, load_config
+from .config import ConfigError, LLMConfig, SearchConfig, load_config, load_search_config
 from .events import (
     AgentError,
     AgentEvent,
@@ -24,6 +24,7 @@ __all__ = [
     "ConfigError",
     "LLMConfig",
     "OpenAIChatModel",
+    "SearchConfig",
     "StreamChunk",
     "TextDelta",
     "ToolCallDelta",
@@ -35,4 +36,5 @@ __all__ = [
     "TurnCompleted",
     "build_default_registry",
     "load_config",
+    "load_search_config",
 ]
