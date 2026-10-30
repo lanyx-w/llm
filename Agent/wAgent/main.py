@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import sys
 
-from core.agent import Agent
+from core.agent import DEFAULT_SYSTEM_PROMPT, Agent
 from core.config import ConfigError, load_config
 from core.llm import OpenAIChatModel
+from core.skills import SkillRegistry, build_system_prompt
 from core.tools import build_default_registry
 from tui.app import AgentTUI
 
@@ -18,7 +19,12 @@ from tui.app import AgentTUI
 def build_agent() -> tuple[Agent, str, str]:
     config = load_config()
     model = OpenAIChatModel(config)
-    agent = Agent(model, build_default_registry())
+    skills = SkillRegistry.discover()
+    agent = Agent(
+        model,
+        build_default_registry(skill_registry=skills),
+        system_prompt=build_system_prompt(DEFAULT_SYSTEM_PROMPT, skills),
+    )
     return agent, config.model_name, config.base_url
 
 

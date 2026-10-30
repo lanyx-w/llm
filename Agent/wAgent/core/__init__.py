@@ -13,6 +13,7 @@ from .events import (
     TurnCompleted,
 )
 from .llm import ChatModel, OpenAIChatModel, StreamChunk, ToolCallDelta
+from .skills import Skill, SkillRegistry, build_system_prompt
 from .tools import ToolRegistry, ToolSpec, build_default_registry
 
 __all__ = [
@@ -25,6 +26,8 @@ __all__ = [
     "LLMConfig",
     "OpenAIChatModel",
     "SearchConfig",
+    "Skill",
+    "SkillRegistry",
     "StreamChunk",
     "TextDelta",
     "ToolCallDelta",
@@ -35,6 +38,7 @@ __all__ = [
     "TurnCancelled",
     "TurnCompleted",
     "build_default_registry",
+    "build_system_prompt",
     "load_config",
     "load_search_config",
 ]

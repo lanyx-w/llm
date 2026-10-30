@@ -20,10 +20,12 @@ wAgent/
 │   ├── events.py              # 供所有前端消费的 Agent 事件
 │   ├── llm.py                 # ChatModel 端口 + OpenAI 适配器
 │   ├── agent.py               # 对话状态与工具调用循环
+│   ├── skills.py              # Agent Skills 发现与按需加载（loadSkill）
 │   └── tools/
 │       ├── __init__.py        # build_default_registry()
 │       ├── base.py            # ToolSpec / ToolRegistry
 │       ├── basic.py           # 日期、闰年、工作目录
+│       ├── cli.py             # RunCli：以当前用户权限执行本地命令行程序
 │       ├── filesystem.py      # 文件/目录读写与增删改
 │       ├── search.py          # 百度搜索 web_search 联网搜索
 │       ├── web.py             # curl 抓取网页 + trafilatura 提取 Markdown
@@ -85,6 +87,12 @@ python main.py
 > 提取正文；如需使用该工具，请确保 `curl` 位于 `PATH` 中。静态 HTML 无法提取正文或
 > 正文过短时，会自动尝试调用本机 Edge / Chrome 无头浏览器渲染页面，以支持 JavaScript 动态内容。
 
+> `RunCli` 可执行本机任意已安装的命令行程序（如 `git`、`python`、`pip`）。
+> 它用 `subprocess` + `shell=False` 直接执行程序，参数以列表传递，不解析管道、
+> 重定向等 Shell 语法；命令以运行 wAgent 的当前用户权限执行。工具会返回标准输出、
+> 标准错误和退出码，默认超时 30 秒，单个输出流超过 8000 字符时会被截断并标注。
+> 该工具仅用于受控教学实验环境，当前阶段不提供命令白名单或审批机制。
+
 > `searchweb` 使用百度搜索 `web_search` 接口；请在 `config.ini` 的 `[search]`
 > 段配置 `baiduqianfan_api_key`，API 地址可通过 `base_url` 覆盖。
 > 该接口只需 API Key，无需 `appid`；返回每条结果的摘要、标题和 URL。
@@ -126,6 +134,32 @@ set WAGENT_CONFIG=D:\path\to\config.ini   # Windows
 > 普通字母键（如 `q`）只会输入到输入框，不会触发退出；退出请用 `Ctrl+X` 或 `/quit`。
 > 请务必在**可交互的终端**中运行（VSCode 的「终端」面板或 Windows Terminal），
 > 不要用 Code Runner 等输出到「输出」面板的方式启动，否则 TUI 无法接收键盘输入。
+
+---
+
+## Agent Skills
+
+wAgent 启动时会以**程序启动时的工作目录**为项目根目录，扫描
+`.agents/skills/` 下的技能目录。每个技能目录必须包含 `SKILL.md`，其开头使用
+YAML Frontmatter 声明 `name` 和 `description`：
+
+```markdown
+---
+name: example-skill
+description: 用一句话说明这个技能能做什么。
+---
+
+这里是技能的完整说明，只会在 LLM 调用 `loadSkill` 时加载。
+```
+
+初始化阶段只读取 Frontmatter 中的 `name` 和 `description` 并注入 System Prompt，
+不会把 `SKILL.md` 正文放进上下文。LLM 需要时调用 `loadSkill`：
+
+- `{"name": "example-skill"}`：返回 `SKILL.md` 全文。
+- `{"name": "example-skill", "filename": "references/guide.md"}`：读取技能目录内的附件。
+
+`filename` 支持相对于技能目录的路径、项目相对路径和绝对路径；只提供文件名时会
+递归搜索技能目录，重名时返回候选路径。所有读取都被限制在该技能目录内部。
 
 ---
 
